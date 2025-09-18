@@ -44,7 +44,7 @@ class DailyMemoManager:
                 logger.info(f"Today's memo already exists: {title}")
                 return existing["results"][0]["id"]
             
-            # Create new memo
+            # Create new memo page
             new_page = self.notion.pages.create(
                 parent={"database_id": self.database_id},
                 properties={
@@ -61,28 +61,235 @@ class DailyMemoManager:
                         "date": {
                             "start": today
                         }
-                    },
-                    "Content": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": f"📝 Team Work Updates - {weekday}\n\n🎯 Today's Goals:\n• \n\n✅ Completed Tasks:\n• \n\n🚧 In Progress:\n• \n\n❗ Blockers/Issues:\n• \n\n💡 Notes:\n• "
-                                }
-                            }
-                        ]
                     }
                 }
             )
             
+            page_id = new_page["id"]
+            
+            # Add content blocks to the page
+            self.notion.blocks.children.append(
+                block_id=page_id,
+                children=[
+                    {
+                        "object": "block",
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": f"📝 Team Work Updates - {weekday}"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "🎯 Today's Goals:"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": " "
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "✅ Completed Tasks:"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": " "
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "🚧 In Progress:"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": " "
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "❗ Blockers/Issues:"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": " "
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "heading_3",
+                        "heading_3": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "💡 Notes:"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": " "
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            )
+            
             logger.info(f"✅ Successfully created today's memo: {title}")
-            return new_page["id"]
+            return page_id
             
         except Exception as e:
             logger.error(f"❌ Failed to create memo: {e}")
             return None
     
+    def extract_text_from_rich_text(self, rich_text):
+        """Extract plain text from rich text objects"""
+        if not rich_text:
+            return ""
+        return "".join([text.get("plain_text", "") for text in rich_text])
+    
+    def format_blocks_to_text(self, blocks):
+        """Convert Notion blocks to readable text format"""
+        content = []
+        
+        for block in blocks:
+            block_type = block.get("type", "")
+            
+            if block_type == "paragraph":
+                text = self.extract_text_from_rich_text(block["paragraph"]["rich_text"])
+                if text.strip():
+                    content.append(text)
+                else:
+                    content.append("")  # Empty line
+                    
+            elif block_type in ["heading_1", "heading_2", "heading_3"]:
+                text = self.extract_text_from_rich_text(block[block_type]["rich_text"])
+                if text.strip():
+                    content.append(f"\n{text}")
+                    
+            elif block_type == "bulleted_list_item":
+                text = self.extract_text_from_rich_text(block["bulleted_list_item"]["rich_text"])
+                if text.strip():
+                    content.append(f"• {text}")
+                    
+            elif block_type == "numbered_list_item":
+                text = self.extract_text_from_rich_text(block["numbered_list_item"]["rich_text"])
+                if text.strip():
+                    content.append(f"1. {text}")
+                    
+            elif block_type == "to_do":
+                text = self.extract_text_from_rich_text(block["to_do"]["rich_text"])
+                checked = "☑️" if block["to_do"].get("checked", False) else "☐"
+                if text.strip():
+                    content.append(f"{checked} {text}")
+                    
+            elif block_type == "code":
+                text = self.extract_text_from_rich_text(block["code"]["rich_text"])
+                if text.strip():
+                    content.append(f"```\n{text}\n```")
+                    
+            elif block_type == "quote":
+                text = self.extract_text_from_rich_text(block["quote"]["rich_text"])
+                if text.strip():
+                    content.append(f"> {text}")
+                    
+        return "\n".join(content)
+    
     def get_today_memo_content(self):
-        """Get today's memo content"""
+        """Get today's memo content including all blocks"""
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         try:
@@ -102,15 +309,17 @@ class DailyMemoManager:
             
             page = results["results"][0]
             page_id = page["id"]
-            
-            # Get page content
-            content_prop = page["properties"]["Content"]["rich_text"]
-            if content_prop:
-                content = "".join([text["text"]["content"] for text in content_prop])
-            else:
-                content = "No updates for today"
-            
             title = page["properties"]["Title"]["title"][0]["text"]["content"]
+            
+            # Get all blocks from the page
+            blocks_response = self.notion.blocks.children.list(block_id=page_id)
+            blocks = blocks_response.get("results", [])
+            
+            # Convert blocks to readable text
+            content = self.format_blocks_to_text(blocks)
+            
+            if not content.strip():
+                content = "No updates have been added to today's memo yet."
             
             return {
                 "title": title,
@@ -175,7 +384,7 @@ class DailyMemoManager:
 
 {memo_data["content"]}
 
-🔗 View full details: {memo_data["url"]}
+🔗 View full details in Notion: {memo_data["url"]}
 
 ⏰ Your local time: {local_time}
 📅 Report generated: {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC
