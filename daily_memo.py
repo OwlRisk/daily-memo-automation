@@ -24,9 +24,13 @@ class DailyMemoManager:
         
     def create_daily_memo(self):
         """Create today's memo in Notion"""
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        weekday = datetime.now(timezone.utc).strftime("%A")
-        title = f"Daily Memo - {today} ({weekday})"
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.strftime("%Y-%m-%d")
+        weekday = now_utc.strftime("%A")
+        
+        # Format title as "Memo - MM/DD/YY HH:MMAM/PM"
+        title_time = now_utc.strftime("%m/%d/%y %I:%M%p")
+        title = f"Memo - {title_time}"
         
         try:
             # Check if today's memo already exists
@@ -44,7 +48,7 @@ class DailyMemoManager:
                 logger.info(f"Today's memo already exists: {title}")
                 return existing["results"][0]["id"]
             
-            # Create new memo page with properties
+            # Create new memo page
             new_page = self.notion.pages.create(
                 parent={"database_id": self.database_id},
                 properties={
