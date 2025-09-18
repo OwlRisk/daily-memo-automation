@@ -1,0 +1,59 @@
+name: Daily Memo Automation
+
+on:
+  schedule:
+    # Create memo at 02:00 UTC daily (10:00 Beijing time)
+    - cron: '0 2 * * *'
+    # Send summary at 14:00 UTC daily (22:00 Beijing time)
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'create'
+        type: choice
+        options:
+        - create
+        - send
+
+jobs:
+  daily-memo:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Determine action
+      id: determine-action
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+        elif [ "$(date -u +%H)" = "02" ]; then
+          echo "action=create" >> $GITHUB_OUTPUT
+        else
+          echo "action=send" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Run daily memo script
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        EMAIL_HOST: smtp.gmail.com
+        EMAIL_PORT: 587
+        EMAIL_USER: info@cvnio.com
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        EMAIL_FROM: info@cvnio.com
+      run: |
+        python daily_memo.py ${{ steps.determine-action.outputs.action }}
