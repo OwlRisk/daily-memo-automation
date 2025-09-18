@@ -1,191 +1,77 @@
+# daily_memo.py
 import os
-import sys
 import smtplib
+import requests
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timezone, timedelta
-from notion_client import Client
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
-class DailyMemoManager:
-    def __init__(self):
-        self.notion = Client(auth=os.environ["NOTION_TOKEN"])
-        self.database_id = os.environ["NOTION_DATABASE_ID"]
-        self.team_members = [
-            {"name": "Brook", "email": "brook.ma@cvnio.com", "timezone": "Asia/Shanghai"},
-            {"name": "Gustavo", "email": "gustavo.paredes@cvnio.com", "timezone": "America/Mexico_City"},
-            {"name": "Sunil", "email": "gummalla.sunilreddy@cvnio.com", "timezone": "Asia/Kolkata"},
-            {"name": "Moiz", "email": "Moizeali@cvnio.com", "timezone": "Asia/Dubai"}
-        ]
-        
-    def create_daily_memo(self):
-        """Create today's memo in Notion"""
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        title = f"Daily Memo - {today}"
-        
-        try:
-            # Check if today's memo already exists
-            existing = self.notion.databases.query(
-                database_id=self.database_id,
-                filter={
-                    "property": "Date",
-                    "date": {
-                        "equals": today
-                    }
-                }
-            )
-            
-            if existing["results"]:
-                logger.info(f"Today's memo already exists: {title}")
-                return existing["results"][0]["id"]
-            
-            # Create new memo
-            new_page = self.notion.pages.create(
-                parent={"database_id": self.database_id},
-                properties={
-                    "Title": {
-                        "title": [
-                            {
-                                "text": {
-                                    "content": title
-                                }
-                            }
-                        ]
-                    },
-                    "Date": {
-                        "date": {
-                            "start": today
-                        }
-                    },
-                    "Content": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": "Please add today's work updates and progress here..."
-                                }
-                            }
-                        ]
-                    }
-                }
-            )
-            
-            logger.info(f"Successfully created today's memo: {title}")
-            return new_page["id"]
-            
-        except Exception as e:
-            logger.error(f"Failed to create memo: {e}")
-            return None
-    
-    def get_today_memo_content(self):
-        """Get today's memo content"""
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        
-        try:
-            results = self.notion.databases.query(
-                database_id=self.database_id,
-                filter={
-                    "property": "Date",
-                    "date": {
-                        "equals": today
-                    }
-                }
-            )
-            
-            if not results["results"]:
-                logger.warning("No memo found for today")
-                return None
-            
-            page = results["results"][0]
-            page_id = page["id"]
-            
-            # Get page content
-            content_prop = page["properties"]["Content"]["rich_text"]
-            if content_prop:
-                content = "".join([text["text"]["content"] for text in content_prop])
-            else:
-                content = "No updates for today"
-            
-            title = page["properties"]["Title"]["title"][0]["text"]["content"]
-            
-            return {
-                "title": title,
-                "content": content,
-                "url": f"https://notion.so/{page_id.replace('-', '')}"
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to get memo content: {e}")
-            return None
-    
-    def send_daily_summary(self):
-        """Send daily summary email"""
-        memo_data = self.get_today_memo_content()
-        if not memo_data:
-            logger.error("Cannot get memo content, canceling email send")
-            return False
-        
-        try:
-            # Setup email server
-            server = smtplib.SMTP(os.environ["EMAIL_HOST"], int(os.environ["EMAIL_PORT"]))
-            server.starttls()
-            server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASSWORD"])
-            
-            # Prepare email content
-            subject = f"Team Daily Report - {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
-            
-            for member in self.team_members:
-                msg = MIMEMultipart()
-                msg['From'] = os.environ["EMAIL_FROM"]
-                msg['To'] = member["email"]
-                msg['Subject'] = subject
-                
-                body = f"""
-Dear {member["name"]},
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT"))
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_FROM = os.getenv("EMAIL_FROM")
+EMAIL_TO = [
+    "brook.ma@cvnio.com",
+    "gustavo.paredes@cvnio.com",
+    "gummalla.sunilreddy@cvnio.com",
+    "Moizeali@cvnio.com"
+]
 
-Here's today's team work summary:
+def get_today_memo():
+    today = datetime.now().strftime("%Y-%m-%d")
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+    query = {"filter": {"property": "Date", "date": {"equals": today}}}
+    res = requests.post(url, headers=headers, json=query)
+    res.raise_for_status()
+    results = res.json()["results"]
+    if not results:
+        return "No memo found."
+    content = results[0]["properties"]["Content"]["rich_text"]
+    return "".join([c["text"]["content"] for c in content]) or "No content yet."
 
-{memo_data["content"]}
+def send_email(content):
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_FROM
+    msg["To"] = ", ".join(EMAIL_TO)
+    msg["Subject"] = "Daily Memo Summary"
+    msg.attach(MIMEText(content, "plain"))
 
-View details: {memo_data["url"]}
+    with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        print("Email sent.")
 
----
-Sent at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC
-"""
-                
-                msg.attach(MIMEText(body, 'plain', 'utf-8'))
-                
-                # Send email
-                text = msg.as_string()
-                server.sendmail(os.environ["EMAIL_FROM"], member["email"], text)
-                logger.info(f"Email sent to {member['name']} ({member['email']})")
-            
-            server.quit()
-            logger.info("All emails sent successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to send emails: {e}")
-            return False
-
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: python daily_memo.py [create|send]")
-        sys.exit(1)
-    
-    action = sys.argv[1]
-    memo_manager = DailyMemoManager()
-    
-    if action == "create":
-        memo_manager.create_daily_memo()
-    elif action == "send":
-        memo_manager.send_daily_summary()
-    else:
-        print("Invalid action. Use 'create' or 'send'")
-        sys.exit(1)
+def create_tomorrow_memo():
+    url = "https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    data = {
+        "parent": {"database_id": DATABASE_ID},
+        "properties": {
+            "Title": {"title": [{"text": {"content": f"Daily Memo - {tomorrow}"}}]},
+            "Date": {"date": {"start": tomorrow}},
+            "Content": {"rich_text": [{"text": {"content": ""}}]}
+        }
+    }
+    res = requests.post(url, headers=headers, json=data)
+    res.raise_for_status()
+    print("New Daily Memo created:", res.json()["id"])
 
 if __name__ == "__main__":
-    main()
+    memo = get_today_memo()
+    send_email(memo)
+    create_tomorrow_memo()
