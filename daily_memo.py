@@ -48,7 +48,7 @@ class DailyMemoManager:
                 logger.info(f"Today's memo already exists: {title}")
                 return existing["results"][0]["id"]
             
-            # Create new memo page
+            # Create new memo page with minimal content
             new_page = self.notion.pages.create(
                 parent={"database_id": self.database_id},
                 properties={
@@ -70,7 +70,7 @@ class DailyMemoManager:
                         "rich_text": [
                             {
                                 "text": {
-                                    "content": f"📝 Team Work Updates - {weekday}\n\n🎯 Today's Goals:\n• \n\n✅ Completed Tasks:\n• \n\n🚧 In Progress:\n• \n\n❗ Blockers/Issues:\n• \n\n💡 Notes:\n• "
+                                    "content": f"📝 Team Work Updates - {weekday}"
                                 }
                             }
                         ]
@@ -80,7 +80,7 @@ class DailyMemoManager:
             
             page_id = new_page["id"]
             
-            # Add detailed content blocks to the page
+            # Add only the main heading block
             try:
                 self.notion.blocks.children.append(
                     block_id=page_id,
@@ -104,174 +104,6 @@ class DailyMemoManager:
                             "type": "paragraph",
                             "paragraph": {
                                 "rich_text": []
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_3",
-                            "heading_3": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "🎯 Today's Goals:"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "Add your goals here"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": []
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_3",
-                            "heading_3": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "✅ Completed Tasks:"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "Add completed tasks here"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": []
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_3",
-                            "heading_3": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "🚧 In Progress:"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "Add in-progress tasks here"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": []
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_3",
-                            "heading_3": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "❗ Blockers/Issues:"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "Add blockers or issues here"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": []
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_3",
-                            "heading_3": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "💡 Notes:"
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": "Add additional notes here"
-                                        }
-                                    }
-                                ]
                             }
                         }
                     ]
